@@ -1,47 +1,77 @@
-import os
 import asyncio
-from dotenv import load_dotenv
+import sqlite3
+import os
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-import openai
+from dotenv import load_dotenv
+from gigachat import GigaChat
+from gigachat.models import Chat
 
 load_dotenv()
-BOT_TOKEN=os.getenv("BOT_TOKEN")
-OPENAI_API_KEY=os.getenv("OPENAI_API_KEY")
+TG_TOKEN=os.getenv("TELEGRAM_TOKEN")
+GIGA_TOKEN=os.getenv("GIGACHAT_TOKEN")
 
-if not BOT_TOKEN or not OPENAI_API_KEY:
-    raise ValueError("Не найден BOT_TOKEN или OPENAI_API_KEY в .env файле!")
 
-os.environ["OPENAI_API_KEY"]=OPENAI_API_KEY
+bot = Bot(token=TG_TOKEN)
+dp = Dispatcher()
 
-bot=Bot(token=BOT_TOKEN)
-dp=Dispatcher()
+giga = GigaChat(credentials=GIGA_TOKEN, verify_ssl_certs=False)
+
+conn = sqlite3.connect("dialogs.db")
+cursor = conn.cursor()
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS dialogs (
+    user_id INTEGER,
+    role TEXT,
+    message TEXT
+)
+""")
+conn.commit()
+
+
+def save_message(user_id: int, role: str, message: str):
+    cursor.execute("INSERT INTO dialogs (user_id, role, message) VALUES (?, ?, ?)",
+                   (user_id, role, message))
+    conn.commit()
+
+
+def get_history(user_id: int):
+    cursor.execute("SELECT role, message FROM dialogs WHERE user_id=? ORDER BY rowid", (user_id,))
+    rows = cursor.fetchall()
+    return [{"role": r, "content": m} for r, m in rows]
+
+
+def clear_history(user_id: int):
+    cursor.execute("DELETE FROM dialogs WHERE user_id=?", (user_id,))
+    conn.commit()
 
 @dp.message(Command("start"))
-async def start_cmd(message: types.Message):
-    await message.answer("Привет! 🤖 Я GPT-бот на OpenAI. Напиши вопрос!")
-@dp.message()
+async def start_handler(message: types.Message):
+    await message.answer(
+        "Привет! 👋 Я бот, который общается через GigaChat от Сбера.\n"
+        "Напиши мне что-нибудь!\n\n"
+    )
 
-async def chat(message: types.Message):
-    user_input=message.text.strip()
-    await message.answer("⏳ Думаю...")
+
+@dp.message()
+async def chat_handler(message: types.Message):
+    user_id=message.from_user.id
+    user_text=message.text
+
+    save_message(user_id, "user", user_text)
+    history=get_history(user_id)
     try:
-        response=openai.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "Ты дружелюбный помощник."},
-                {"role": "user", "content": user_input}
-            ],
-            max_tokens=500
-        )
-        reply=response.choices[0].message.content
-        await message.answer(reply)
+        chat_request=Chat(messages=history)
+        response=giga.chat(chat_request)
+        answer=response.choices[0].message.content
     except Exception as e:
-        await message.answer(f"⚠️ Ошибка OpenAI: {e}")
+        answer = f"Ошибка использования GigaChat: {e}"
+    save_message(user_id, "assistant", answer)
+    await message.answer(answer)
 
 async def main():
-    print("🚀 Бот запущен...")
+    print("🚀 Бот запущен!")
     await dp.start_polling(bot)
 
-if __name__ == "__main__":
+if __name__=="__main__":
     asyncio.run(main())
