@@ -4,21 +4,15 @@ import os
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from dotenv import load_dotenv
-from gigachat import GigaChat
-from gigachat.models import Chat
 
 load_dotenv()
 TG_TOKEN=os.getenv("TELEGRAM_TOKEN")
-GIGA_TOKEN=os.getenv("GIGACHAT_TOKEN")
 
+bot=Bot(token=TG_TOKEN)
+dp=Dispatcher()
 
-bot = Bot(token=TG_TOKEN)
-dp = Dispatcher()
-
-giga = GigaChat(credentials=GIGA_TOKEN, verify_ssl_certs=False)
-
-conn = sqlite3.connect("dialogs.db")
-cursor = conn.cursor()
+conn=sqlite3.connect("dialogs.db")
+cursor=conn.cursor()
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS dialogs (
     user_id INTEGER,
@@ -37,7 +31,7 @@ def save_message(user_id: int, role: str, message: str):
 
 def get_history(user_id: int):
     cursor.execute("SELECT role, message FROM dialogs WHERE user_id=? ORDER BY rowid", (user_id,))
-    rows = cursor.fetchall()
+    rows=cursor.fetchall()
     return [{"role": r, "content": m} for r, m in rows]
 
 
@@ -45,11 +39,12 @@ def clear_history(user_id: int):
     cursor.execute("DELETE FROM dialogs WHERE user_id=?", (user_id,))
     conn.commit()
 
+
 @dp.message(Command("start"))
 async def start_handler(message: types.Message):
     await message.answer(
-        "Привет! 👋 Я бот, который общается через GigaChat от Сбера.\n"
-        "Напиши мне что-нибудь!\n\n"
+        "Привет! 👋 Я бесполезный бот.\n"
+        "Пиши что хочешь — я всё равно отвечу одно и то же 😎"
     )
 
 
@@ -59,19 +54,17 @@ async def chat_handler(message: types.Message):
     user_text=message.text
 
     save_message(user_id, "user", user_text)
-    history=get_history(user_id)
-    try:
-        chat_request=Chat(messages=history)
-        response=giga.chat(chat_request)
-        answer=response.choices[0].message.content
-    except Exception as e:
-        answer = f"Ошибка использования GigaChat: {e}"
+
+    answer="Привет, я бесполезный бот 🤖"
+
     save_message(user_id, "assistant", answer)
     await message.answer(answer)
+
 
 async def main():
     print("🚀 Бот запущен!")
     await dp.start_polling(bot)
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
     asyncio.run(main())
