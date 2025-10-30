@@ -6,13 +6,13 @@ from aiogram.filters import Command
 from dotenv import load_dotenv
 
 load_dotenv()
-TG_TOKEN=os.getenv("TELEGRAM_TOKEN")
+TG_TOKEN = os.getenv("TELEGRAM_TOKEN")
 
-bot=Bot(token=TG_TOKEN)
-dp=Dispatcher()
+bot = Bot(token=TG_TOKEN)
+dp = Dispatcher()
 
-conn=sqlite3.connect("dialogs.db")
-cursor=conn.cursor()
+conn = sqlite3.connect("dialogs.db")
+cursor = conn.cursor()
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS dialogs (
     user_id INTEGER,
@@ -31,7 +31,7 @@ def save_message(user_id: int, role: str, message: str):
 
 def get_history(user_id: int):
     cursor.execute("SELECT role, message FROM dialogs WHERE user_id=? ORDER BY rowid", (user_id,))
-    rows=cursor.fetchall()
+    rows = cursor.fetchall()
     return [{"role": r, "content": m} for r, m in rows]
 
 
@@ -50,12 +50,12 @@ async def start_handler(message: types.Message):
 
 @dp.message()
 async def chat_handler(message: types.Message):
-    user_id=message.from_user.id
-    user_text=message.text
+    user_id = message.from_user.id
+    user_text = message.text
 
     save_message(user_id, "user", user_text)
 
-    answer="Привет, я бесполезный бот 🤖"
+    answer = "Привет, я бесполезный бот 🤖"
 
     save_message(user_id, "assistant", answer)
     await message.answer(answer)
