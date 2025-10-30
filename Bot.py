@@ -60,8 +60,15 @@ async def chat_handler(message: types.Message):
 
     save_message(user_id, "user", user_text)
     history=get_history(user_id)
+    filtered_history = [m for m in history if m["role"] in ("user", "assistant")]
     try:
-        chat_request=Chat(messages=history)
+        chat_request = Chat(
+            messages=[
+                         {"role": "system",
+                          "content": "Ты — фильтр политических тем. Если запрос связан с политикой отвечай только 'Да' и ничего больше"},
+                         {"role": "user", "content": user_text}
+                     ] + filtered_history
+        )
         response=giga.chat(chat_request)
         answer=response.choices[0].message.content
     except Exception as e:
