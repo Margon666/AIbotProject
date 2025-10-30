@@ -8,9 +8,8 @@ from gigachat import GigaChat
 from gigachat.models import Chat
 
 load_dotenv()
-TG_TOKEN=os.getenv("TELEGRAM_TOKEN")
-GIGA_TOKEN=os.getenv("GIGACHAT_TOKEN")
-
+TG_TOKEN = os.getenv("TELEGRAM_TOKEN")
+GIGA_TOKEN = os.getenv("GIGACHAT_TOKEN")
 
 bot = Bot(token=TG_TOKEN)
 dp = Dispatcher()
@@ -45,6 +44,7 @@ def clear_history(user_id: int):
     cursor.execute("DELETE FROM dialogs WHERE user_id=?", (user_id,))
     conn.commit()
 
+
 @dp.message(Command("start"))
 async def start_handler(message: types.Message):
     await message.answer(
@@ -55,11 +55,11 @@ async def start_handler(message: types.Message):
 
 @dp.message()
 async def chat_handler(message: types.Message):
-    user_id=message.from_user.id
-    user_text=message.text
+    user_id = message.from_user.id
+    user_text = message.text
 
     save_message(user_id, "user", user_text)
-    history=get_history(user_id)
+    history = get_history(user_id)
     filtered_history = [m for m in history if m["role"] in ("user", "assistant")]
     try:
         chat_request = Chat(
@@ -69,16 +69,18 @@ async def chat_handler(message: types.Message):
                          {"role": "user", "content": user_text}
                      ] + filtered_history
         )
-        response=giga.chat(chat_request)
-        answer=response.choices[0].message.content
+        response = giga.chat(chat_request)
+        answer = response.choices[0].message.content
     except Exception as e:
         answer = f"Ошибка использования GigaChat: {e}"
     save_message(user_id, "assistant", answer)
     await message.answer(answer)
 
+
 async def main():
     print("🚀 Бот запущен!")
     await dp.start_polling(bot)
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
     asyncio.run(main())
