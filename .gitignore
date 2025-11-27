@@ -224,3 +224,4 @@ Bot.py
 # src
 src/dp_test.py
 src/handlers_test.py
+src/db_test.py
