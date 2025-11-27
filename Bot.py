@@ -37,7 +37,7 @@ def save_message(user_id: int, role: str, message: str):
 def get_history(user_id: int):
     cursor.execute("SELECT role, message FROM dialogs WHERE user_id=? ORDER BY rowid", (user_id,))
     rows = cursor.fetchall()
-    return [{"role": r, "content": m} for r, m in rows]
+    return [{"role": r[0], "content": r[1]} for r in rows]
 
 
 def clear_history(user_id: int):
@@ -46,51 +46,90 @@ def clear_history(user_id: int):
 
 
 @dp.message(Command("start"))
-async def start_handler(message: types.Message):
-    await message.answer(
-        "Привет! 👋 Я бот, который общается через GigaChat от Сбера.\n"
-        "Напиши мне что-нибудь!\n\n"
-    )
+async def start_command(message: types.Message):
+    welcome_text = """
+    Привет! Я бот-ассистент по программированию и тайм-менеджменту.
+
+    Я могу помочь вам с:
+    - Вопросами по программированию (Python, JavaScript, и др.)
+    - Решением проблем с кодом
+    - Советами по тайм-менеджменту и продуктивности
+    - Планированием задач и организации времени
+
+    Доступные команды:
+    /start - показать это сообщение
+    /clear - очистить историю диалога
+    /help - показать справку
+    """
+    await message.answer(welcome_text)
+
+
+@dp.message(Command("help"))
+async def help_command(message: types.Message):
+    help_text = """
+    Я специализируюсь на двух темах:
+
+    📚 Программирование:
+    - Помощь с кодом
+    - Объяснение концепций
+    - Решение ошибок
+    - Рекомендации по инструментам
+
+    ⏰ Тайм-менеджмент:
+    - Планирование времени
+    - Организация задач
+    - Повышение продуктивности
+    - Методы работы
+
+    Если ваш вопрос не по этим темам, я отвечу: "Я не могу ответить на это сообщение"
+
+    Команды:
+    /clear - очистить историю диалога
+    """
+    await message.answer(help_text)
+
+
+@dp.message(Command("clear"))
+async def clear_command(message: types.Message):
+    clear_history(message.from_user.id)
+    await message.answer("История диалога очищена! ✅")
 
 
 @dp.message()
-async def chat_handler(message: types.Message):
+async def handle_message(message: types.Message):
     user_id = message.from_user.id
-    user_text = message.text
+    user_message = message.text
 
-    save_message(user_id, "user", user_text)
+    save_message(user_id, "user", user_message)
+
     history = get_history(user_id)
-    filtered_history = [m for m in history if m["role"] in ("user", "assistant")]
-    system_message = {
-        "role": "system",
-        "content": (
-            "Ты — интеллектуальный ассистент, работающий в Telegram-боте через GigaChat.\n"
-            "Ты ведёшь диалоги с пользователями, при этом контекст их сообщений сохраняется "
-            "в локальной базе данных SQLite под названием 'dialogs.db'.\n\n"
-            "Структура таблицы 'dialogs' следующая:\n"
-            " - user_id (INTEGER) — уникальный идентификатор пользователя Telegram,\n"
-            " - role (TEXT) — роль участника диалога ('user' или 'assistant'),\n"
-            " - message (TEXT) — текст сообщения.\n\n"
-            "Диалоги загружаются в память перед каждым новым ответом, чтобы сохранять контекст.\n\n"
-            "Ты должен отвечать только на вопросы, связанные с:\n"
-            "1. Программированием (Python, JavaScript, алгоритмы, базы данных и т.п.)\n"
-            "2. Тайм-менеджментом (планирование, продуктивность, управление временем).\n\n"
-            "Если пользователь задаёт вопрос вне этих тем, отвечай строго фразой:\n"
-            "'Извини, я могу отвечать только на вопросы о программировании и тайм-менеджменте.'"
-        )
-    }
+
+    system_prompt = """Ты - опытный ассистент, специализирующийся на программировании и тайм-менеджменте. 
+    Ты отвечаешь только на вопросы, связанные с:
+    1. Программирование: код, алгоритмы, языки программирования, технологии
+    2. Тайм-менеджмент: планирование времени, продуктивность, организация задач
+
+    На любые другие темы ты отвечаешь строго: "Я не могу ответить на это сообщение"
+
+    Отвечай кратко, по делу и полезно."""
+
+    messages = [{"role": "system", "content": system_prompt}] + history
+
     try:
-        chat_request = Chat(messages=[system_message] + filtered_history + [{"role": "user", "content": user_text}])
-        response = giga.chat(chat_request)
-        answer = response.choices[0].message.content
+        response = giga.chat(Chat(messages=messages))
+        bot_response = response.choices[0].message.content
+
+        save_message(user_id, "assistant", bot_response)
+
+        await message.answer(bot_response)
+
     except Exception as e:
-        answer = f"Ошибка использования GigaChat: {e}"
-    save_message(user_id, "assistant", answer)
-    await message.answer(answer)
+        print(f"Ошибка при обращении к GigaChat: {e}")
+        await message.answer("Извините, произошла ошибка при обработке вашего запроса. Попробуйте позже.")
 
 
 async def main():
-    print("🚀 Бот запущен!")
+    print("Бот запущен...")
     await dp.start_polling(bot)
 
 
