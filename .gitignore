@@ -220,7 +220,7 @@ os
 
 # Py files
 Bot.py
-
+Bot_with_database.py
 # src
 src/dp_test.py
 src/handlers_test.py
