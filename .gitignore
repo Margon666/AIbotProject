@@ -225,3 +225,5 @@ Bot_with_database.py
 src/dp_test.py
 src/handlers_test.py
 src/db_test.py
+# sql files
+dialogs.db
